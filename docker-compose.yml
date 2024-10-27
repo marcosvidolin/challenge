@@ -1,0 +1,78 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: challenge
+      RABBITMQ_DEFAULT_PASS: challenge
+    volumes:
+      - rabbitmq_data:/data
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: challenge_db_user
+      POSTGRES_PASSWORD: challenge_db_pass
+      POSTGRES_DB: challenge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    environment:
+      REDIS_PASSWORD: challenge_cache_pass
+    ports:
+      - "6379:6379"
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "challenge_cache_pass",
+        "--appendonly",
+        "yes",
+      ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "challenge_cache_pass", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  api:
+    build: ./api
+    container_name: api
+    env_file:
+      - ./api/.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  rabbitmq_data:
+  postgres_data:
+  redis_data:

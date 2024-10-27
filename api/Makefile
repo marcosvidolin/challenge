@@ -1,0 +1,6 @@
+run:
+	@go run ./...
+
+generate-code:
+	@go generate ./...
+
